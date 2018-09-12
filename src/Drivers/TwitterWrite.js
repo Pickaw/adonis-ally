@@ -103,7 +103,7 @@ class TwitterWrite extends OAuthScheme {
     user
       .setOriginal(userProfile)
       .setFields(
-        userProfile.id,
+        userProfile.id_str,
         userProfile.screen_name,
         userProfile.email,
         userProfile.name,
