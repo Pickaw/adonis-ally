@@ -123,7 +123,7 @@ class Twitter extends OAuthScheme {
    * @return {String}
    */
   async getRedirectUrl (scope) {
-    return (await this.getUrl()) + (scope ? '&' + scope.join('&') : '')
+    return (await this.getUrl()) + (scope && scope.length ? '&' + scope.join('&') : '')
   }
 
   /**
