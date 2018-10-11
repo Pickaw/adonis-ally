@@ -13,7 +13,7 @@ const CE = require('../Exceptions')
 const OAuth2Scheme = require('../Schemes/OAuth2')
 const AllyUser = require('../AllyUser')
 const got = require('got')
-const utils = require('../../utils')
+const utils = require('../../lib/utils')
 const _ = require('lodash')
 
 class Twitch extends OAuth2Scheme {
