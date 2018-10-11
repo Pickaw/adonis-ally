@@ -15,6 +15,7 @@ module.exports = {
   google: require('./Google'),
   linkedin: require('./LinkedIn'),
   twitter: require('./Twitter'),
+  twitch: require('./Twitch'),
   twitter_write: require('./TwitterWrite'),
   instagram: require('./Instagram'),
   foursquare: require('./Foursquare')
