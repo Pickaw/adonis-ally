@@ -107,7 +107,7 @@ class Twitter extends OAuthScheme {
         userProfile.screen_name,
         userProfile.email,
         userProfile.name,
-        userProfile.profile_image_url.replace('_normal.jpg', '.jpg')
+        userProfile.profile_image_url_https.replace(/_normal(\.\w+)$/, '$1')
       )
       .setToken(accessTokenResponse.accessToken, null, accessTokenResponse.tokenSecret, null)
 
