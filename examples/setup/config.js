@@ -10,11 +10,19 @@
 */
 
 module.exports = {
-  get: function () {
+  get: function (key) {
+    if (key === 'app.appKey') {
+      return 'bubblegum'
+    }
+
     return {
       clientId: process.env.CLIENT_ID,
       clientSecret: process.env.CLIENT_SECRET,
       redirectUri: process.env.REDIRECT_URI
     }
+  },
+
+  merge (key, value) {
+    return value
   }
 }

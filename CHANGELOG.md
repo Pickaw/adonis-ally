@@ -1,3 +1,51 @@
+<a name="2.1.3"></a>
+## [2.1.3](https://github.com/adonisjs/adonis-ally/compare/v2.1.2...v2.1.3) (2019-03-06)
+
+
+
+<a name="2.1.2"></a>
+## [2.1.2](https://github.com/adonisjs/adonis-ally/compare/v2.1.1...v2.1.2) (2018-10-15)
+
+
+### Bug Fixes
+
+* **package:** publish templates directory ([877d1fd](https://github.com/adonisjs/adonis-ally/commit/877d1fd))
+* **twitter:** fetch id_str and https picture ([#60](https://github.com/adonisjs/adonis-ally/issues/60)) ([7e11c57](https://github.com/adonisjs/adonis-ally/commit/7e11c57))
+
+
+
+<a name="2.1.1"></a>
+## [2.1.1](https://github.com/adonisjs/adonis-ally/compare/v2.1.0...v2.1.1) (2018-10-02)
+
+
+### Bug Fixes
+
+* **authenticator:** use correct cookie options for oauth state to work ([e1bf087](https://github.com/adonisjs/adonis-ally/commit/e1bf087)), closes [#59](https://github.com/adonisjs/adonis-ally/issues/59)
+
+
+
+<a name="2.1.0"></a>
+# [2.1.0](https://github.com/adonisjs/adonis-ally/compare/v2.0.5...v2.1.0) (2018-09-29)
+
+
+### Code Refactoring
+
+* **expose scope and fields as public properties:** all drivers now allows mutating scopes and f ([0ac72ca](https://github.com/adonisjs/adonis-ally/commit/0ac72ca))
+
+
+### Features
+
+* add state when performing oauth ([c3d2689](https://github.com/adonisjs/adonis-ally/commit/c3d2689)), closes [#2](https://github.com/adonisjs/adonis-ally/issues/2)
+
+
+### BREAKING CHANGES
+
+* **expose scope and fields as public properties:** Anyone using the driver instance directly now have to mutate scope array directly
+vs passing scope array to getRedireUrl method and mutate fields array directly vs passing fields
+array to getUser method
+
+
+
 <a name="2.0.5"></a>
 ## [2.0.5](https://github.com/adonisjs/adonis-ally/compare/v2.0.4...v2.0.5) (2018-07-16)
 
