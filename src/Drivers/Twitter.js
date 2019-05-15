@@ -134,7 +134,9 @@ class Twitter extends OAuthScheme {
    *
    * @return {String}
    */
-  async getRedirectUrl (scope) {
+  async getRedirectUrl () {
+    let scope = this.scope
+    this.scope = []
     return (await this.getUrl()) + (scope && scope.length ? '&' + scope.join('&') : '')
   }
 
