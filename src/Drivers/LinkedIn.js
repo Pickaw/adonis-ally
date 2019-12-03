@@ -1,20 +1,10 @@
 'use strict'
 
-/*
- * adonis-ally
- *
- * (c) Harminder Virk <virk@adonisjs.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
-*/
-
 const got = require('got')
-
 const CE = require('../Exceptions')
 const OAuth2Scheme = require('../Schemes/OAuth2')
-const AllyUser = require('../AllyUser')
 const utils = require('../../lib/utils')
+const AllyUser = require('../AllyUser')
 const _ = require('lodash')
 
 /**
@@ -35,19 +25,8 @@ class LinkedIn extends OAuth2Scheme {
     this._redirectUri = config.redirectUri
     this._redirectUriOptions = _.merge({ response_type: 'code' }, config.options)
 
-    this.scope = _.size(config.scope) ? config.scope : ['r_basicprofile', 'r_emailaddress']
-    this.fields = _.size(config.fields) ? config.fields : [
-      'id',
-      'first-name',
-      'last-name',
-      'formatted-name',
-      'email-address',
-      'location',
-      'industry',
-      'public-profile-url',
-      'picture-url',
-      'picture-urls::(original)'
-    ]
+    this.scope = _.size(config.scope) ? config.scope : ['r_liteprofile', 'r_emailaddress']
+    this.fields = _.size(config.fields) ? config.fields : ['id', 'firstName', 'lastName', 'localizedFirstName', 'localizedLastName', 'profilePicture']
   }
 
   /**
@@ -134,12 +113,39 @@ class LinkedIn extends OAuth2Scheme {
    * @private
    */
   async _getUserProfile (accessToken) {
-    const profileUrl = `https://api.linkedin.com/v1/people/~:(${this.fields.join(',')})`
+    const profileUrl = `https://api.linkedin.com/v2/me?fields=${this.fields.join(',')}&projection=(${this.fields.join(',')}(displayImage~digitalmediaAsset:playableStreams))`
 
     const response = await got(profileUrl, {
       headers: {
         'x-li-format': 'json',
-        'Authorization': `Bearer ${accessToken}`
+        Authorization: `Bearer ${accessToken}`
+      },
+      json: true
+    })
+
+    return response.body
+  }
+
+  /**
+   * Returns the user email as an object using the
+   * access token.
+   *
+   * @attribute _getUserEmail
+   *
+   * @param   {String} accessToken
+   *
+   * @return  {Object}
+   *
+   * @private
+   */
+  async _getUserEmail (accessToken) {
+    const emailUrl =
+      'https://api.linkedin.com/v2/clientAwareMemberHandles?q=members&projection=(elements*(primary,type,handle~))'
+
+    const response = await got(emailUrl, {
+      headers: {
+        'x-li-format': 'json',
+        Authorization: `Bearer ${accessToken}`
       },
       json: true
     })
@@ -157,17 +163,20 @@ class LinkedIn extends OAuth2Scheme {
    *
    * @private
    */
-  _buildAllyUser (userProfile, accessTokenResponse) {
+  _buildAllyUser (userProfile, email, accessTokenResponse) {
     const user = new AllyUser()
     const expires = _.get(accessTokenResponse, 'result.expires_in')
+    const emailAddress = email.elements.find(e => e.type === 'EMAIL')
 
-    user.setOriginal(userProfile)
+    user
+      .setOriginal(userProfile)
       .setFields(
         userProfile.id,
-        userProfile.formattedName,
-        userProfile.emailAddress,
-        userProfile.formattedName,
-        userProfile.pictureUrl
+        userProfile.firstName.localized[Object.keys(userProfile.firstName.localized)[0]],
+        userProfile.lastName.localized[Object.keys(userProfile.lastName.localized)[0]],
+        emailAddress && emailAddress['handle~'] && emailAddress['handle~'].emailAddress,
+        null,
+        null
       )
       .setToken(
         accessTokenResponse.accessToken,
@@ -189,7 +198,10 @@ class LinkedIn extends OAuth2Scheme {
    * @return {String}
    */
   async getRedirectUrl (state) {
-    const options = state ? Object.assign(this._redirectUriOptions, { state }) : this._redirectUriOptions
+    const options = state
+      ? Object.assign(this._redirectUriOptions, { state })
+      : this._redirectUriOptions
+
     return this.getUrl(this._redirectUri, this.scope, options)
   }
 
@@ -244,7 +256,8 @@ class LinkedIn extends OAuth2Scheme {
     })
 
     const userProfile = await this._getUserProfile(accessTokenResponse.accessToken)
-    return this._buildAllyUser(userProfile, accessTokenResponse)
+    const emailAddress = await this._getUserEmail(accessTokenResponse.accessToken)
+    return this._buildAllyUser(userProfile, emailAddress, accessTokenResponse)
   }
 
   /**
@@ -259,7 +272,7 @@ class LinkedIn extends OAuth2Scheme {
   async getUserByToken (accessToken) {
     const userProfile = await this._getUserProfile(accessToken)
 
-    return this._buildAllyUser(userProfile, { accessToken, refreshToken: null })
+    return this._buildAllyUser(userProfile, null, { accessToken, refreshToken: null })
   }
 }
 
