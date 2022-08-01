@@ -172,9 +172,9 @@ class LinkedIn extends OAuth2Scheme {
       .setOriginal(userProfile)
       .setFields(
         userProfile.id,
-        userProfile.firstName.localized[Object.keys(userProfile.firstName.localized)[0]],
-        userProfile.lastName.localized[Object.keys(userProfile.lastName.localized)[0]],
+        `${userProfile.firstName.localized[Object.keys(userProfile.firstName.localized)[0]]} ${userProfile.lastName.localized[Object.keys(userProfile.lastName.localized)[0]]}`,
         emailAddress && emailAddress['handle~'] && emailAddress['handle~'].emailAddress,
+        null,
         null,
         null
       )
