@@ -61,7 +61,7 @@
     "debug": "^4.0.1",
     "got": "8.3.2",
     "lodash": "^4.17.11",
-    "oauth": "Pickaw/node-oauth",
+    "oauth": "Pickaw/node-oauth@0.10.0",
     "uuid": "^3.3.2"
   },
   "repository": {
