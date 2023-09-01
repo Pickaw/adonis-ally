@@ -96,7 +96,10 @@ class OAuth2 {
       throw GE.InvalidArgumentException.missingParameter('oauth2', 'clientSecret', '2nd')
     }
 
-    const baseUrl = `${this.baseUrl.replace(/\/$/, '')}/`
+    let baseUrl = ''
+
+    if (!this.authorizeUrl.match('tiktok')) baseUrl = `${this.baseUrl.replace(/\/$/, '')}/`
+
     this.client = new NodeOAuth2(clientId, clientSecret, baseUrl, this.authorizeUrl, this.accessTokenUrl, headers)
   }
 
