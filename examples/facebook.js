@@ -10,24 +10,28 @@ ioc.bind('Adonis/Src/Config', () => {
 })
 
 http.get('/facebook', async function (request, response) {
-  const ally = new Ally(request, response)
+  const ally = new Ally(ioc.use('Adonis/Src/Config'), request, response)
   const facebook = ally.driver('facebook')
-  response.writeHead(200, {'content-type': 'text/html'})
-  const url = await facebook.getRedirectUrl()
-  response.write(`<a href="${url}">Login With Facebook</a>`)
-  response.end()
+
+  if (request.input('redirect')) {
+    await facebook.redirect()
+  } else {
+    response.writeHead(200, { 'content-type': 'text/html' })
+    response.write(`<a href="/facebook?redirect=true">Login With Facebook</a>`)
+    response.end()
+  }
 })
 
 http.get('/facebook/authenticated', async function (request, response) {
-  const ally = new Ally(request, response)
+  const ally = new Ally(ioc.use('Adonis/Src/Config'), request, response)
   const facebook = ally.driver('facebook')
   try {
     const user = await facebook.getUser()
-    response.writeHead(200, {'content-type': 'application/json'})
+    response.writeHead(200, { 'content-type': 'application/json' })
     response.write(JSON.stringify({ original: user.getOriginal(), profile: user.toJSON() }))
   } catch (e) {
-    response.writeHead(500, {'content-type': 'application/json'})
-    response.write(JSON.stringify({ error: e }))
+    response.writeHead(500, { 'content-type': 'application/json' })
+    response.write(JSON.stringify({ error: e.message }))
   }
   response.end()
 })

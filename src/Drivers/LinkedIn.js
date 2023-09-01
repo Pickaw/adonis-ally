@@ -1,20 +1,10 @@
 'use strict'
 
-/*
- * adonis-ally
- *
- * (c) Harminder Virk <virk@adonisjs.com>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
-*/
-
 const got = require('got')
-
 const CE = require('../Exceptions')
 const OAuth2Scheme = require('../Schemes/OAuth2')
-const AllyUser = require('../AllyUser')
 const utils = require('../../lib/utils')
+const AllyUser = require('../AllyUser')
 const _ = require('lodash')
 
 /**
@@ -32,14 +22,11 @@ class LinkedIn extends OAuth2Scheme {
 
     super(config.clientId, config.clientSecret, config.headers)
 
-    /**
-     * Oauth specific values to be used when creating the redirect
-     * url or fetching user profile.
-     */
-    this._scope = this._getInitialScopes(config.scope)
-    this._fields = this._getInitialFields(config.fields)
     this._redirectUri = config.redirectUri
-    this._redirectUriOptions = _.merge({response_type: 'code'}, config.options)
+    this._redirectUriOptions = _.merge({ response_type: 'code' }, config.options)
+
+    this.scope = _.size(config.scope) ? config.scope : ['r_liteprofile', 'r_emailaddress']
+    this.fields = _.size(config.fields) ? config.fields : ['id', 'firstName', 'lastName', 'localizedFirstName', 'localizedLastName', 'profilePicture']
   }
 
   /**
@@ -51,6 +38,18 @@ class LinkedIn extends OAuth2Scheme {
    */
   static get inject () {
     return ['Adonis/Src/Config']
+  }
+
+  /**
+   * Returns a boolean telling if driver supports
+   * state
+   *
+   * @method supportStates
+   *
+   * @return {Boolean}
+   */
+  get supportStates () {
+    return true
   }
 
   /**
@@ -83,7 +82,7 @@ class LinkedIn extends OAuth2Scheme {
    *
    * @attribute authorizeUrl
    *
-   * @return {String} [description]
+   * @return {String}
    */
   get authorizeUrl () {
     return 'authorization'
@@ -102,71 +101,51 @@ class LinkedIn extends OAuth2Scheme {
   }
 
   /**
-   * Returns initial scopes to be used right from the
-   * config file. Otherwise it will fallback to the
-   * commonly used scopes.
-   *
-   * @method _getInitialScopes
-   *
-   * @param   {Array} scopes
-   *
-   * @return  {Array}
-   *
-   * @private
-   */
-  _getInitialScopes (scopes) {
-    return _.size(scopes) ? scopes : ['r_basicprofile', 'r_emailaddress']
-  }
-
-  /**
-   * Returns the initial fields to be used right from the
-   * config file. Otherwise it will fallback to the
-   * commonly used fields.
-   *
-   * @method _getInitialFields
-   *
-   * @param   {Array} fields
-   *
-   * @return  {Array}
-   *
-   * @private
-   */
-  _getInitialFields (fields) {
-    return _.size(fields) ? fields : [
-      'id',
-      'first-name',
-      'last-name',
-      'formatted-name',
-      'email-address',
-      'location',
-      'industry',
-      'public-profile-url',
-      'picture-url',
-      'picture-urls::(original)'
-    ]
-  }
-
-  /**
    * Returns the user profile as an object using the
    * access token.
    *
    * @attribute _getUserProfile
    *
    * @param   {String} accessToken
-   * @param   {Array} [fields]
    *
    * @return  {Object}
    *
    * @private
    */
-  async _getUserProfile (accessToken, fields) {
-    fields = _.size(fields) ? fields : this._fields
-    const profileUrl = `https://api.linkedin.com/v1/people/~:(${fields.join(',')})`
+  async _getUserProfile (accessToken) {
+    const profileUrl = `https://api.linkedin.com/v2/me?fields=${this.fields.join(',')}&projection=(${this.fields.join(',')}(displayImage~digitalmediaAsset:playableStreams))`
 
     const response = await got(profileUrl, {
       headers: {
         'x-li-format': 'json',
-        'Authorization': `Bearer ${accessToken}`
+        Authorization: `Bearer ${accessToken}`
+      },
+      json: true
+    })
+
+    return response.body
+  }
+
+  /**
+   * Returns the user email as an object using the
+   * access token.
+   *
+   * @attribute _getUserEmail
+   *
+   * @param   {String} accessToken
+   *
+   * @return  {Object}
+   *
+   * @private
+   */
+  async _getUserEmail (accessToken) {
+    const emailUrl =
+      'https://api.linkedin.com/v2/clientAwareMemberHandles?q=members&projection=(elements*(primary,type,handle~))'
+
+    const response = await got(emailUrl, {
+      headers: {
+        'x-li-format': 'json',
+        Authorization: `Bearer ${accessToken}`
       },
       json: true
     })
@@ -184,17 +163,20 @@ class LinkedIn extends OAuth2Scheme {
    *
    * @private
    */
-  _buildAllyUser (userProfile, accessTokenResponse) {
+  _buildAllyUser (userProfile, email, accessTokenResponse) {
     const user = new AllyUser()
     const expires = _.get(accessTokenResponse, 'result.expires_in')
+    const emailAddress = email.elements.find(e => e.type === 'EMAIL')
 
-    user.setOriginal(userProfile)
+    user
+      .setOriginal(userProfile)
       .setFields(
         userProfile.id,
-        userProfile.formattedName,
-        userProfile.emailAddress,
-        userProfile.formattedName,
-        userProfile.pictureUrl
+        `${userProfile.firstName.localized[Object.keys(userProfile.firstName.localized)[0]]} ${userProfile.lastName.localized[Object.keys(userProfile.lastName.localized)[0]]}`,
+        emailAddress && emailAddress['handle~'] && emailAddress['handle~'].emailAddress,
+        null,
+        null,
+        null
       )
       .setToken(
         accessTokenResponse.accessToken,
@@ -210,15 +192,17 @@ class LinkedIn extends OAuth2Scheme {
    * Returns the redirect url for a given provider.
    *
    * @method getRedirectUrl
-   * @async
    *
-   * @param  {Array} scope
+   * @param {String} [state]
    *
    * @return {String}
    */
-  async getRedirectUrl (scope) {
-    scope = _.size(scope) ? scope : this._scope
-    return this.getUrl(this._redirectUri, scope, this._redirectUriOptions)
+  async getRedirectUrl (state) {
+    const options = state
+      ? Object.assign(this._redirectUriOptions, { state })
+      : this._redirectUriOptions
+
+    return this.getUrl(this._redirectUri, this.scope, options)
   }
 
   /**
@@ -243,12 +227,13 @@ class LinkedIn extends OAuth2Scheme {
    * @async
    *
    * @param {Object} queryParams
-   * @param {Array} [fields]
+   * @param {String} [originalState]
    *
    * @return {Object}
    */
-  async getUser (queryParams, fields) {
+  async getUser (queryParams, originalState) {
     const code = queryParams.code
+    const state = queryParams.state
 
     /**
      * Throw an exception when query string does not have
@@ -259,22 +244,35 @@ class LinkedIn extends OAuth2Scheme {
       throw CE.OAuthException.tokenExchangeException(errorMessage, null, errorMessage)
     }
 
+    /**
+     * Valid state with original state
+     */
+    if (state && originalState !== state) {
+      throw CE.OAuthException.invalidState()
+    }
+
     const accessTokenResponse = await this.getAccessToken(code, this._redirectUri, {
       grant_type: 'authorization_code'
     })
 
-    const userProfile = await this._getUserProfile(accessTokenResponse.accessToken, fields)
-    return this._buildAllyUser(userProfile, accessTokenResponse)
+    const userProfile = await this._getUserProfile(accessTokenResponse.accessToken)
+    const emailAddress = await this._getUserEmail(accessTokenResponse.accessToken)
+    return this._buildAllyUser(userProfile, emailAddress, accessTokenResponse)
   }
 
   /**
+   * Get user by access token
    *
-   * @param {string} accessToken
+   * @method getUserByToken
+   *
+   * @param  {String}       accessToken
+   *
+   * @return {void}
    */
-  async getUserByToken (accessToken, filds) {
-    const userProfile = await this._getUserProfile(accessToken, filds)
+  async getUserByToken (accessToken) {
+    const userProfile = await this._getUserProfile(accessToken)
 
-    return this._buildAllyUser(userProfile, {accessToken, refreshToken: null})
+    return this._buildAllyUser(userProfile, null, { accessToken, refreshToken: null })
   }
 }
 

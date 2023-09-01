@@ -18,18 +18,17 @@ const utils = require('../../lib/utils')
 const _ = require('lodash')
 
 /**
- * Facebook driver to authenticate a user using
- * OAuth2 scheme.
+ * TikTok driver to authenticating users via OAuth2Scheme.
  *
- * @class Facebook
+ * @class TikTok
  * @constructor
  */
-class Facebook extends OAuth2Scheme {
+class TikTok extends OAuth2Scheme {
   constructor (Config) {
-    const config = Config.get('services.ally.facebook')
+    const config = Config.get('services.ally.tiktok')
 
-    utils.validateDriverConfig('facebook', config)
-    utils.debug('facebook', config)
+    utils.validateDriverConfig('tiktok', config)
+    utils.debug('tiktok', config)
 
     super(config.clientId, config.clientSecret, config.headers)
 
@@ -37,14 +36,12 @@ class Facebook extends OAuth2Scheme {
      * Oauth specific values to be used when creating the redirect
      * url or fetching user profile.
      */
+    this._clientId = config.clientId
+    this._clientSecret = config.clientSecret
     this._redirectUri = config.redirectUri
-    this._redirectUriOptions = Object.assign({ response_type: 'code' }, config.options)
+    this._redirectUriOptions = _.merge({ response_type: 'code' }, config.options)
 
-    /**
-     * Public fields to be mutated from outside
-     */
-    this.scope = _.size(config.scope) ? config.scope : ['email']
-    this.fields = _.size(config.fields) ? config.fields : ['name', 'email', 'gender', 'verified', 'link']
+    this.scope = _.size(config.scope) ? config.scope : ['user.info.basic', 'user.info.username']
   }
 
   /**
@@ -84,14 +81,14 @@ class Facebook extends OAuth2Scheme {
 
   /**
    * Base url to be used for constructing
-   * facebook oauth urls.
+   * google oauth urls.
    *
    * @attribute baseUrl
    *
    * @return {String}
    */
   get baseUrl () {
-    return 'https://graph.facebook.com/v2.1'
+    return ''
   }
 
   /**
@@ -103,7 +100,7 @@ class Facebook extends OAuth2Scheme {
    * @return {String} [description]
    */
   get authorizeUrl () {
-    return 'oauth/authorize'
+    return `https://www.tiktok.com/v2/auth/authorize`
   }
 
   /**
@@ -115,14 +112,15 @@ class Facebook extends OAuth2Scheme {
    * @return {String}
    */
   get accessTokenUrl () {
-    return 'oauth/access_token'
+    return 'https://business-api.tiktok.com/open_api/v1.3/tt_user/oauth2/token/'
   }
 
   /**
    * Returns the user profile as an object using the
    * access token.
    *
-   * @method _getInitialFields
+   * @method _getUserProfile
+   * @async
    *
    * @param   {String} accessToken
    *
@@ -130,12 +128,13 @@ class Facebook extends OAuth2Scheme {
    *
    * @private
    */
-  async _getUserProfile (accessToken) {
-    const profileUrl = `${this.baseUrl}/me?access_token=${accessToken}&fields=${this.fields.join(',')}`
+  async _getUserProfile (accessTokenResponse) {
+    const profileUrl = `https://business-api.tiktok.com/open_api/v1.3/business/get/?business_id=${accessTokenResponse.result.data.open_id}&fields=["username", "display_name", "profile_image", "followers_count"]`
 
     const response = await got(profileUrl, {
       headers: {
-        'Accept': 'application/json'
+        'Content-Type': 'application/json',
+        'Access-Token': accessTokenResponse.accessToken,
       },
       json: true
     })
@@ -154,18 +153,18 @@ class Facebook extends OAuth2Scheme {
    * @private
    */
   _buildAllyUser (userProfile, accessTokenResponse) {
+
     const user = new AllyUser()
     const expires = _.get(accessTokenResponse, 'result.expires_in')
 
-    const avatarUrl = `${this.baseUrl}/${userProfile.id}/picture?type=normal`
 
-    user.setOriginal(userProfile)
+    user.setOriginal(_.merge(userProfile, { data: { open_id: accessTokenResponse.result.data.open_id } }))
       .setFields(
-        userProfile.id,
-        userProfile.name,
-        userProfile.email,
-        userProfile.name,
-        avatarUrl
+        accessTokenResponse.result.data.open_id,
+        userProfile.data.name,
+        null,
+        userProfile.data.display_name,
+        userProfile.data.profile_picture
       )
       .setToken(
         accessTokenResponse.accessToken,
@@ -173,7 +172,6 @@ class Facebook extends OAuth2Scheme {
         null,
         expires ? Number(expires) : null
       )
-
     return user
   }
 
@@ -187,28 +185,12 @@ class Facebook extends OAuth2Scheme {
    * @return {String}
    */
   async getRedirectUrl (state) {
-    const options = state ? Object.assign(this._redirectUriOptions, { state }) : this._redirectUriOptions
+    const options = state ? Object.assign(this._redirectUriOptions, { state }, { client_key: this._clientId }) : this._redirectUriOptions
     return this.getUrl(this._redirectUri, this.scope, options)
   }
 
   /**
-   * Parses provider error by fetching error message
-   * from nested data property.
-   *
-   * @method parseProviderError
-   *
-   * @param  {Object} error
-   *
-   * @return {Error}
-   */
-  parseProviderError (error) {
-    const parsedError = _.isString(error.data) ? JSON.parse(error.data) : null
-    const message = _.get(parsedError, 'error.message', error)
-    return CE.OAuthException.tokenExchangeException(message, error.statusCode, parsedError)
-  }
-
-  /**
-   * Parses the redirect errors returned by facebook
+   * Parses the redirect errors returned by tiktok
    * and returns the error message.
    *
    * @method parseRedirectError
@@ -218,7 +200,7 @@ class Facebook extends OAuth2Scheme {
    * @return {String}
    */
   parseRedirectError (queryParams) {
-    return queryParams.error_message || 'Oauth failed during redirect'
+    return queryParams.error || 'Oauth failed during redirect'
   }
 
   /**
@@ -226,8 +208,6 @@ class Facebook extends OAuth2Scheme {
    * and token expiry.
    *
    * @method getUser
-   *
-   * @param {Object} queryParams
    * @param {String} [originalState]
    *
    * @return {Object}
@@ -253,22 +233,25 @@ class Facebook extends OAuth2Scheme {
     }
 
     const accessTokenResponse = await this.getAccessToken(code, this._redirectUri, {
-      grant_type: 'authorization_code'
+      grant_type: 'authorization_code',
+      headers: {
+        'Content-Type': 'application/json'
+      }
     })
 
-    const userProfile = await this._getUserProfile(accessTokenResponse.accessToken)
+    const userProfile = await this._getUserProfile(accessTokenResponse)
     return this._buildAllyUser(userProfile, accessTokenResponse)
   }
 
   /**
    *
    * @param {string} accessToken
-   * @param {array} fields
    */
   async getUserByToken (accessToken) {
     const userProfile = await this._getUserProfile(accessToken)
+
     return this._buildAllyUser(userProfile, { accessToken, refreshToken: null })
   }
 }
 
-module.exports = Facebook
+module.exports = TikTok

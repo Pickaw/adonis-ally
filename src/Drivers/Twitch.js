@@ -13,7 +13,7 @@ const CE = require('../Exceptions')
 const OAuth2Scheme = require('../Schemes/OAuth2')
 const AllyUser = require('../AllyUser')
 const got = require('got')
-const utils = require('../../utils')
+const utils = require('../../lib/utils')
 const _ = require('lodash')
 
 class Twitch extends OAuth2Scheme {
@@ -62,7 +62,7 @@ class Twitch extends OAuth2Scheme {
    * @return {String}
    */
   get baseUrl () {
-    return 'https://api.twitch.tv/kraken'
+    return 'https://id.twitch.tv'
   }
 
   /**
@@ -72,7 +72,7 @@ class Twitch extends OAuth2Scheme {
    * @return {String} [description]
    */
   get authorizeUrl () {
-    return '/oauth2/authorize'
+    return 'oauth2/authorize'
   }
 
   /**
@@ -82,7 +82,7 @@ class Twitch extends OAuth2Scheme {
    * @return {String}
    */
   get accessTokenUrl () {
-    return '/oauth2/token'
+    return 'oauth2/token'
   }
 
   /**
@@ -91,7 +91,7 @@ class Twitch extends OAuth2Scheme {
    * @return {String}
    */
   get apiUrl () {
-    return 'https://api.twitch.tv/kraken'
+    return 'https://api.twitch.tv/helix'
   }
 
   /**
@@ -121,15 +121,15 @@ class Twitch extends OAuth2Scheme {
    * @private
    */
   async _getUserProfile (accessToken, fields) {
-    const response = await got(`${this.apiUrl}/user`, {
+    const response = await got(`${this.apiUrl}/users`, {
       headers: {
-        'Authorization': accessToken?'OAuth ' + accessToken : undefined,
-        'Accept': `Accept: application/vnd.twitchtv.${this._api_version}+json`,
+        'Authorization': accessToken?'Bearer ' + accessToken : undefined,
+        // 'Accept': `Accept: application/vnd.twitchtv.${this._api_version}+json`,
         'Client-ID': this.config.clientId
       },
       json: true
     })
-    return response.body
+    return response.body.data[0]
   }
 
   /**
@@ -199,11 +199,11 @@ class Twitch extends OAuth2Scheme {
     user
       .setOriginal(userProfile)
       .setFields(
-        userProfile._id,
+        userProfile.id,
         userProfile.display_name,
         userProfile.email,
-        userProfile.name,
-        userProfile.logo
+        userProfile.login,
+        userProfile.profile_image_url
       )
       .setToken(
         accessTokenResponse.accessToken,
