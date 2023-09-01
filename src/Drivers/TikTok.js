@@ -158,7 +158,7 @@ class TikTok extends OAuth2Scheme {
     const expires = _.get(accessTokenResponse, 'result.expires_in')
 
 
-    user.setOriginal(userProfile)
+    user.setOriginal(_.merge(userProfile, { data: { open_id: accessTokenResponse.result.data.open_id } }))
       .setFields(
         accessTokenResponse.result.data.open_id,
         userProfile.data.name,
