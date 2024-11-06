@@ -25,8 +25,8 @@ class LinkedIn extends OAuth2Scheme {
     this._redirectUri = config.redirectUri
     this._redirectUriOptions = _.merge({ response_type: 'code' }, config.options)
 
-    this.scope = _.size(config.scope) ? config.scope : ['r_liteprofile', 'r_emailaddress']
-    this.fields = _.size(config.fields) ? config.fields : ['id', 'firstName', 'lastName', 'localizedFirstName', 'localizedLastName', 'profilePicture']
+    this.scope = _.size(config.scope) ? config.scope : ['r_basicprofile', 'r_emailaddress']
+    this.fields = _.size(config.fields) ? config.fields : ['id', 'firstName', 'lastName', 'localizedFirstName', 'localizedLastName', 'vanityName', 'profilePicture']
   }
 
   /**
@@ -175,7 +175,7 @@ class LinkedIn extends OAuth2Scheme {
         `${userProfile.firstName.localized[Object.keys(userProfile.firstName.localized)[0]]} ${userProfile.lastName.localized[Object.keys(userProfile.lastName.localized)[0]]}`,
         emailAddress && emailAddress['handle~'] && emailAddress['handle~'].emailAddress,
         null,
-        null,
+        userProfile.vanityName,
         null
       )
       .setToken(
