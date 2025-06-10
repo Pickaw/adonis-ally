@@ -98,7 +98,7 @@ class OAuth2 {
 
     let baseUrl = ''
 
-    if (!this.authorizeUrl.match('tiktok')) baseUrl = `${this.baseUrl.replace(/\/$/, '')}/`
+    if (!this.authorizeUrl.match('tiktok') && !this.authorizeUrl.match('threads')) baseUrl = `${this.baseUrl.replace(/\/$/, '')}/`
 
     this.client = new NodeOAuth2(clientId, clientSecret, baseUrl, this.authorizeUrl, this.accessTokenUrl, headers)
   }
