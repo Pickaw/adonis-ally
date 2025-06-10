@@ -19,5 +19,6 @@ module.exports = {
   twitter_write: require('./TwitterWrite'),
   instagram: require('./Instagram'),
   tiktok: require('./TikTok'),
-  foursquare: require('./Foursquare')
+  foursquare: require('./Foursquare'),
+  threads: require('./Threads')
 }
