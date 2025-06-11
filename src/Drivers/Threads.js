@@ -142,6 +142,86 @@ class Threads extends OAuth2Scheme {
   }
 
   /**
+   * Exchange a short-lived access token for a long-lived token
+   *
+   * @method _exchangeForLongLivedToken
+   * @async
+   *
+   * @param   {String} shortLivedToken
+   *
+   * @return  {Object}
+   *
+   * @private
+   */
+  async _exchangeForLongLivedToken (shortLivedToken) {
+    const exchangeUrl = `https://graph.threads.net/access_token?grant_type=th_exchange_token&client_secret=${this._clientSecret}&access_token=${shortLivedToken}`
+
+    const response = await got(exchangeUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      json: true
+    })
+
+    return {
+      accessToken: response.body.access_token,
+      tokenType: response.body.token_type,
+      expiresIn: response.body.expires_in,
+      expiresAt: new Date(Date.now() + (response.body.expires_in * 1000))
+    }
+  }
+
+  /**
+   * Refresh a long-lived access token
+   *
+   * @method refreshLongLivedToken
+   * @async
+   *
+   * @param   {String} longLivedToken
+   *
+   * @return  {Object}
+   *
+   * @public
+   */
+  async refreshLongLivedToken (longLivedToken) {
+    const refreshUrl = `https://graph.threads.net/refresh_access_token?grant_type=th_refresh_token&access_token=${longLivedToken}`
+
+    const response = await got(refreshUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      json: true
+    })
+
+    return {
+      accessToken: response.body.access_token,
+      tokenType: response.body.token_type,
+      expiresIn: response.body.expires_in,
+      expiresAt: new Date(Date.now() + (response.body.expires_in * 1000))
+    }
+  }
+
+  /**
+   * Check if a token needs refresh (if it's older than 24 hours but not expired)
+   *
+   * @method shouldRefreshToken
+   * @async
+   *
+   * @param   {Date} expiresAt
+   *
+   * @return  {Boolean}
+   *
+   * @public
+   */
+  shouldRefreshToken (expiresAt) {
+    const now = new Date()
+    const oneDayFromNow = new Date(now.getTime() + (24 * 60 * 60 * 1000))
+
+    // Refresh if token expires within 24 hours
+    return expiresAt <= oneDayFromNow && expiresAt > now
+  }
+
+  /**
    * Normalize the user profile response and build an Ally user.
    *
    * @param {object} userProfile
@@ -154,9 +234,6 @@ class Threads extends OAuth2Scheme {
   _buildAllyUser (userProfile, accessTokenResponse) {
 
     const user = new AllyUser()
-    const expires = _.get(accessTokenResponse, 'result.expires_in')
-
-    console.log('_buildAllyUser', accessTokenResponse, userProfile)
 
     user.setOriginal(userProfile)
       .setFields(
@@ -170,8 +247,16 @@ class Threads extends OAuth2Scheme {
         accessTokenResponse.accessToken,
         null,
         null,
-        null
+        accessTokenResponse.expiresIn || null
       )
+
+    // Add additional token information for database storage
+    user.tokenInfo = {
+      expiresIn: accessTokenResponse.expiresIn,
+      expiresAt: accessTokenResponse.expiresAt,
+      tokenType: accessTokenResponse.tokenType || 'bearer'
+    }
+
     return user
   }
 
@@ -232,15 +317,19 @@ class Threads extends OAuth2Scheme {
       throw CE.OAuthException.invalidState()
     }
 
-    const accessTokenResponse = await this.getAccessToken(code, this._redirectUri, {
+    // Get short-lived token first
+    const shortLivedTokenResponse = await this.getAccessToken(code, this._redirectUri, {
       grant_type: 'authorization_code',
       headers: {
         'Content-Type': 'application/json'
       }
     })
 
-    const userProfile = await this._getUserProfile(accessTokenResponse)
-    return this._buildAllyUser(userProfile, accessTokenResponse)
+    // Exchange for long-lived token
+    const longLivedTokenResponse = await this._exchangeForLongLivedToken(shortLivedTokenResponse.accessToken)
+
+    const userProfile = await this._getUserProfile(longLivedTokenResponse)
+    return this._buildAllyUser(userProfile, longLivedTokenResponse)
   }
 
   /**
@@ -248,7 +337,7 @@ class Threads extends OAuth2Scheme {
    * @param {string} accessToken
    */
   async getUserByToken (accessToken) {
-    const userProfile = await this._getUserProfile(accessToken)
+    const userProfile = await this._getUserProfile({ accessToken })
 
     return this._buildAllyUser(userProfile, { accessToken, refreshToken: null })
   }
